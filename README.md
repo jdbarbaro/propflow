@@ -85,8 +85,19 @@ with `time.sleep()`.
 
 ---
 
+## Deploying on Railway
+
+To deploy on Railway, base64-encode `credentials.json` and set it as the `GOOGLE_CREDENTIALS_B64` environment variable — PropFlow will write the file to disk on startup.
+
+```bash
+base64 -i credentials.json | tr -d '\n' | pbcopy   # macOS — copies to clipboard
+```
+
+Set all other `.env` values as Railway environment variables, and set `DRY_RUN=false`.
+
+---
+
 ## Security Notes
 
 - Never commit `.env` or `credentials.json`. Both are in `.gitignore`.
-- Rotate `GRAPH_CLIENT_SECRET` regularly via the Azure Portal.
-- The service account key grants write access to your sheet — treat it like a password.
+- The service account key grants access to Gmail, Sheets, and Drive — treat it like a password.

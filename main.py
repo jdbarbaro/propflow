@@ -16,7 +16,9 @@ Phase 2 pipeline (runs after Phase 1 ACK, never blocks it):
   10. Update the Sheets row with Phase 2 routing fields.
 """
 
+import base64
 import logging
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -189,6 +191,14 @@ def run() -> None:
     Main polling loop. Checks for unread emails every POLL_INTERVAL_SECONDS.
     A failure on any single email is caught and logged so the loop continues.
     """
+    # ── Railway credentials bootstrap ────────────────────────────────────────
+    b64 = os.environ.get("GOOGLE_CREDENTIALS_B64")
+    if b64:
+        with open("credentials.json", "wb") as f:
+            f.write(base64.b64decode(b64))
+        logger.info("credentials.json written from GOOGLE_CREDENTIALS_B64.")
+    # ─────────────────────────────────────────────────────────────────────────
+
     logger.info("PropFlow started. Polling every %ds.", POLL_INTERVAL_SECONDS)
 
     while True:
