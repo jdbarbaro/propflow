@@ -1,11 +1,12 @@
 """
-agents/notifier.py — Sends Phase 2 notification emails to building supers
-and assigned vendors via the Gmail API.
+agents/notifier.py — Sends notification emails to supers, vendors, and tenants
+via the Gmail API.
 
 When DRY_RUN=true, emails are printed to the terminal instead of sent.
 """
 
 import logging
+import time
 from gmail_client import send_email
 from config import DRY_RUN
 
@@ -30,13 +31,17 @@ def notify_super(
     subject: str,
     body: str,
     gmail_service=None,
-) -> bool:
+) -> tuple[bool, str | None]:
     """
     Sends a notification email to the building super.
-    When DRY_RUN=true, prints the email to terminal and returns True.
+    When DRY_RUN=true, prints the email to terminal.
 
     Returns:
-        True if the email was sent (or dry-run printed) successfully, False otherwise.
+        (sent: bool, thread_id: str | None)
+        thread_id is the Gmail thread ID of the sent message, used by Cycle 2
+        to match the super's reply back to this pending request.
+        In DRY_RUN mode, a placeholder thread_id is returned so the Pending
+        tab write still works during local testing.
     """
     super_email = building.get("super_email", "").strip()
     if not super_email:
@@ -44,19 +49,19 @@ def notify_super(
             "No super_email on building %r — skipping super notification.",
             building.get("full_address"),
         )
-        return False
+        return False, None
 
     if DRY_RUN:
         _dry_run_log(super_email, subject, body)
-        return True
+        return True, f"dry_run_{int(time.time())}"
 
     try:
-        send_email(to_address=super_email, subject=subject, body=body)
-        logger.info("Super notification sent to %s.", super_email)
-        return True
+        thread_id = send_email(to_address=super_email, subject=subject, body=body)
+        logger.info("Super notification sent to %s (thread_id=%s).", super_email, thread_id)
+        return True, thread_id
     except Exception as e:
         logger.error("Failed to send super notification to %s: %s", super_email, e)
-        return False
+        return False, None
 
 
 def notify_vendor(
@@ -67,7 +72,7 @@ def notify_vendor(
 ) -> bool:
     """
     Sends a job dispatch email to the assigned vendor.
-    When DRY_RUN=true, prints the email to terminal and returns True.
+    When DRY_RUN=true, prints the email to terminal.
 
     Returns:
         True if the email was sent (or dry-run printed) successfully, False otherwise.
@@ -90,4 +95,41 @@ def notify_vendor(
         return True
     except Exception as e:
         logger.error("Failed to send vendor outreach to %s: %s", vendor_email, e)
+        return False
+
+
+def notify_tenant(
+    tenant_email: str,
+    subject: str,
+    body: str,
+    thread_id: str = None,
+    message_id: str = None,
+) -> bool:
+    """
+    Sends a status update email back to the tenant (used in Cycle 2).
+    When DRY_RUN=true, prints the email to terminal.
+
+    Returns:
+        True if the email was sent (or dry-run printed) successfully, False otherwise.
+    """
+    if not tenant_email:
+        logger.warning("notify_tenant called with no tenant_email — skipping.")
+        return False
+
+    if DRY_RUN:
+        _dry_run_log(tenant_email, subject, body)
+        return True
+
+    try:
+        send_email(
+            to_address=tenant_email,
+            subject=subject,
+            body=body,
+            thread_id=thread_id,
+            message_id=message_id,
+        )
+        logger.info("Tenant notification sent to %s.", tenant_email)
+        return True
+    except Exception as e:
+        logger.error("Failed to send tenant notification to %s: %s", tenant_email, e)
         return False

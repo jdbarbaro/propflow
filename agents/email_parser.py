@@ -115,6 +115,38 @@ def parse_email(subject: str, body: str, sender_email: str = None) -> dict:
     return result
 
 
+def parse_super_reply(subject: str, body: str) -> str:
+    """
+    Classifies a building super's reply to a PropFlow approval request.
+
+    Returns:
+        "can_handle" — super says they can fix it in-house, no outside vendor needed.
+        "needs_vendor" — super says they need a contractor, or the reply is unclear.
+                         Defaults to "needs_vendor" on any API failure (safe default).
+    """
+    prompt = (
+        "You are reading a building superintendent's reply to a maintenance request.\n"
+        "Classify their response as exactly one of these two labels:\n\n"
+        "  can_handle   — the super says they can fix it themselves in-house, "
+        "no outside contractor needed\n"
+        "  needs_vendor — the super says they need an outside contractor, "
+        "cannot handle it, or the reply is unclear or non-committal\n\n"
+        "Reply with ONLY the label — no punctuation, no explanation.\n\n"
+        f"Subject: {subject}\n\n{body}"
+    )
+    try:
+        response = client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=10,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result = response.content[0].text.strip().lower()
+        return "can_handle" if "can_handle" in result else "needs_vendor"
+    except anthropic.APIError as e:
+        logger.error("Anthropic API error parsing super reply: %s", e)
+        return "needs_vendor"  # safe default — dispatch vendor if uncertain
+
+
 def build_acknowledgment(parsed: dict) -> str:
     """
     Generates a short, professional acknowledgment email body to send back

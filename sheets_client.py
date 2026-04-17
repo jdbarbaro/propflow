@@ -25,6 +25,7 @@ from config import (
     GOOGLE_SHEET_NAME,
     GOOGLE_BUILDINGS_SHEET,
     GOOGLE_VENDORS_SHEET,
+    GOOGLE_PENDING_SHEET,
 )
 
 logger = logging.getLogger(__name__)
@@ -225,6 +226,151 @@ def get_vendor(trade: str, geography: str, urgency: str) -> dict | None:
 
     candidates.sort(key=lambda x: x[0])
     return candidates[0][1]
+
+
+# ── Pending tab ───────────────────────────────────────────────────────────────
+# Columns A–M track requests awaiting super approval before vendor dispatch.
+PENDING_COLUMNS = [
+    "Timestamp",           # A
+    "Building ID",         # B
+    "Building Address",    # C
+    "Super Email",         # D
+    "Tenant Email",        # E
+    "Unit Number",         # F
+    "Issue Type",          # G
+    "Urgency",             # H
+    "Description",         # I
+    "Tenant Requests Row", # J
+    "Super Thread ID",     # K
+    "Status",              # L  — Awaiting Super | In-House | Vendor Dispatched | Closed
+    "Resolution Note",     # M
+]
+
+
+def write_pending_request(data: dict) -> int | None:
+    """
+    Writes a new row to the Pending tab for a request awaiting super approval.
+
+    Args:
+        data: Dict with keys: building_id, building_address, super_email,
+              tenant_email, unit_number, issue_type, urgency, description,
+              tenant_requests_row, super_thread_id.
+
+    Returns:
+        The 1-based row number of the new Pending row, or None on failure.
+    """
+    from datetime import datetime, timezone
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    row = [
+        timestamp,
+        data.get("building_id") or "",
+        data.get("building_address") or "",
+        data.get("super_email") or "",
+        data.get("tenant_email") or "",
+        data.get("unit_number") or "",
+        data.get("issue_type") or "",
+        data.get("urgency") or "",
+        data.get("description") or "",
+        str(data.get("tenant_requests_row") or ""),
+        data.get("super_thread_id") or "",
+        "Awaiting Super",
+        "",
+    ]
+
+    service = get_sheets_service()
+    try:
+        response = service.spreadsheets().values().append(
+            spreadsheetId=GOOGLE_SPREADSHEET_ID,
+            range=f"{GOOGLE_PENDING_SHEET}!A1",
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [row]},
+        ).execute()
+        updated_range = response.get("updates", {}).get("updatedRange", "")
+        match = re.search(r":?[A-Z]+(\d+)$", updated_range)
+        row_number = int(match.group(1)) if match else None
+        logger.info("Pending request written (row %s, thread_id=%s).", row_number, data.get("super_thread_id"))
+        return row_number
+    except HttpError as e:
+        logger.error("Failed to write Pending row: %s", e)
+        return None
+
+
+def get_pending_by_thread(thread_id: str) -> tuple[dict, int] | tuple[None, None]:
+    """
+    Finds an open pending request whose super_thread_id matches the given thread_id.
+    Only rows with status "Awaiting Super" are returned — resolved rows are skipped.
+
+    Returns:
+        (pending_dict, 1-based_row_number) if found, else (None, None).
+    """
+    if not thread_id:
+        return None, None
+
+    service = get_sheets_service()
+    try:
+        response = (
+            service.spreadsheets()
+            .values()
+            .get(spreadsheetId=GOOGLE_SPREADSHEET_ID, range=f"{GOOGLE_PENDING_SHEET}!A1:Z")
+            .execute()
+        )
+    except HttpError as e:
+        logger.error("Failed to read Pending tab: %s", e)
+        return None, None
+
+    values = response.get("values", [])
+    if not values or len(values) < 2:
+        return None, None
+
+    headers = [h.strip().lower().replace(" ", "_") for h in values[0]]
+
+    # Locate the columns we need by header name
+    try:
+        thread_col = headers.index("super_thread_id")
+    except ValueError:
+        logger.error("Pending tab missing 'Super Thread ID' column.")
+        return None, None
+
+    status_col = headers.index("status") if "status" in headers else -1
+
+    for row_idx, row in enumerate(values[1:], start=2):  # row 2 = first data row
+        padded = row + [""] * (len(headers) - len(row))
+        if padded[thread_col] != thread_id:
+            continue
+        # Only match rows still awaiting a response
+        status = padded[status_col].strip().lower() if status_col >= 0 else ""
+        if status not in ("awaiting super", ""):
+            continue
+        return dict(zip(headers, padded)), row_idx
+
+    return None, None
+
+
+def update_pending_status(row_number: int, status: str, note: str = "") -> None:
+    """
+    Updates the Status (col L) and optionally Resolution Note (col M) of a Pending row.
+
+    Args:
+        row_number: 1-based row number in the Pending tab.
+        status: New status string e.g. "In-House", "Vendor Dispatched", "Closed".
+        note: Optional resolution note (vendor name, reason, etc.).
+    """
+    data = [{"range": f"{GOOGLE_PENDING_SHEET}!L{row_number}", "values": [[status]]}]
+    if note:
+        data.append({"range": f"{GOOGLE_PENDING_SHEET}!M{row_number}", "values": [[note]]})
+
+    service = get_sheets_service()
+    try:
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=GOOGLE_SPREADSHEET_ID,
+            body={"valueInputOption": "USER_ENTERED", "data": data},
+        ).execute()
+        logger.info("Pending row %d updated: status=%r note=%r", row_number, status, note)
+    except HttpError as e:
+        logger.error("Failed to update Pending row %d: %s", row_number, e)
+        raise
 
 
 def get_vendor_by_name(vendor_name: str) -> dict | None:

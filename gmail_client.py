@@ -150,7 +150,7 @@ def send_email(
     body: str,
     thread_id: str = None,
     message_id: str = None,
-) -> None:
+) -> str | None:
     """
     Sends a plain-text email from the monitored Gmail mailbox.
 
@@ -162,6 +162,10 @@ def send_email(
         message_id: If provided, sets In-Reply-To and References headers so
                     the reply threads correctly in the recipient's email client,
                     and prefixes the subject with 'Re: ' if not already present.
+
+    Returns:
+        The Gmail threadId of the sent message, or None on failure.
+        Used by notify_super() to track which thread to watch for the super's reply.
     """
     service = get_gmail_service()
 
@@ -182,7 +186,8 @@ def send_email(
         message_body["threadId"] = thread_id
 
     try:
-        service.users().messages().send(userId="me", body=message_body).execute()
+        result = service.users().messages().send(userId="me", body=message_body).execute()
+        return result.get("threadId")
     except HttpError as e:
         logger.error("Failed to send email to %s: %s", to_address, e)
         raise

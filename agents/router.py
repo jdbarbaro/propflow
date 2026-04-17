@@ -165,6 +165,48 @@ def check_approval_required(
     return estimated_cost > threshold_value
 
 
+def build_super_approval_request(parsed: dict, building: dict) -> str:
+    """
+    Generates the Cycle 1 email to the building super asking whether they can
+    handle the tenant request in-house or need an outside vendor dispatched.
+
+    Returns a plain-text email body. Falls back to a template if the API call fails.
+    """
+    prompt = (
+        f"Write a brief, professional email to the building superintendent "
+        f"for {building.get('full_address', 'the building')}.\n\n"
+        f"A tenant has submitted the following request:\n"
+        f"- Tenant: {parsed.get('tenant_name') or 'Unknown'}, "
+        f"Unit {parsed.get('unit_number') or 'Unknown'}\n"
+        f"- Issue: {parsed.get('issue_type')} — {parsed.get('issue_description')}\n"
+        f"- Urgency: {parsed.get('urgency')}\n\n"
+        f"Ask the superintendent directly and clearly: can they handle this in-house, "
+        f"or should PropFlow dispatch an outside vendor? Request a quick reply — "
+        f"a simple yes/no is fine. "
+        f"Keep it direct and professional, 3–4 sentences. "
+        f"Do not include a subject line. Sign off as 'PropFlow Property Management'."
+    )
+    try:
+        response = client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.content[0].text.strip()
+    except anthropic.APIError as e:
+        logger.error("Anthropic API error generating super approval request: %s", e)
+        return (
+            f"A tenant request has been submitted for Unit "
+            f"{parsed.get('unit_number') or 'Unknown'} at "
+            f"{building.get('full_address', 'your building')}.\n\n"
+            f"Issue: {parsed.get('issue_type')} — {parsed.get('issue_description')}\n"
+            f"Urgency: {parsed.get('urgency')}\n\n"
+            "Can you handle this in-house, or should we dispatch an outside vendor? "
+            "A quick reply is appreciated.\n\n"
+            "PropFlow Property Management"
+        )
+
+
 def build_super_notification(
     parsed_email: dict,
     building: dict,
