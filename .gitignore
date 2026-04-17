@@ -19,3 +19,6 @@ build/
 .vscode/
 .idea/
 .claude/
+.env
+credentials.json
+token.json
