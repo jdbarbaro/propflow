@@ -56,7 +56,7 @@ def notify_super(
         return True, f"dry_run_{int(time.time())}"
 
     try:
-        thread_id = send_email(to_address=super_email, subject=subject, body=body)
+        thread_id, _ = send_email(to_address=super_email, subject=subject, body=body)
         logger.info("Super notification sent to %s (thread_id=%s).", super_email, thread_id)
         return True, thread_id
     except Exception as e:

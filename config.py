@@ -27,5 +27,8 @@ GOOGLE_PENDING_SHEET = os.getenv("GOOGLE_PENDING_SHEET", "Pending")
 # Google Drive folder path containing management agreement PDFs
 PROPFLOW_DRIVE_FOLDER = os.getenv("PROPFLOW_DRIVE_FOLDER", "PropFlow/Management Agreements")
 
+# PropFlow owner/operator email — used for escalation notifications
+PROPFLOW_OWNER_EMAIL = os.getenv("PROPFLOW_OWNER_EMAIL", "")
+
 # Dry-run mode — print outbound emails to terminal instead of sending
 DRY_RUN = os.getenv("DRY_RUN", "true").lower() == "true"

@@ -150,7 +150,7 @@ def send_email(
     body: str,
     thread_id: str = None,
     message_id: str = None,
-) -> str | None:
+) -> tuple[str | None, str | None]:
     """
     Sends a plain-text email from the monitored Gmail mailbox.
 
@@ -164,8 +164,8 @@ def send_email(
                     and prefixes the subject with 'Re: ' if not already present.
 
     Returns:
-        The Gmail threadId of the sent message, or None on failure.
-        Used by notify_super() to track which thread to watch for the super's reply.
+        Tuple of (thread_id, message_id) of the sent message, or (None, None) on failure.
+        thread_id is used to track reply threads; message_id is used for In-Reply-To threading.
     """
     service = get_gmail_service()
 
@@ -187,10 +187,87 @@ def send_email(
 
     try:
         result = service.users().messages().send(userId="me", body=message_body).execute()
-        return result.get("threadId")
+        return result.get("threadId"), result.get("id")
     except HttpError as e:
         logger.error("Failed to send email to %s: %s", to_address, e)
         raise
+
+
+def fetch_thread_reply(thread_id: str, expected_sender: str | None = None) -> dict | None:
+    """
+    Fetches a Gmail thread and returns the first reply not sent by the monitored
+    mailbox, optionally restricted to a specific sender address.
+
+    Skips messages from the monitored mailbox itself and from mailer-daemon /
+    postmaster addresses (delivery failure notifications).
+
+    Used by check_pending_threads() to detect super replies regardless of
+    whether they have been opened/read in Gmail.
+
+    Args:
+        thread_id: Gmail thread ID to inspect.
+        expected_sender: If provided, only return a message from this address
+                         (case-insensitive). Useful to avoid matching bounces
+                         or unrelated replies in the same thread.
+
+    Returns:
+        An email dict (same structure as fetch_unread_emails()) for the first
+        matching reply, or None if no reply has arrived yet.
+    """
+    service = get_gmail_service()
+
+    try:
+        thread = service.users().threads().get(
+            userId="me", id=thread_id, format="full"
+        ).execute()
+    except HttpError as e:
+        logger.error("Failed to fetch thread %s: %s", thread_id, e)
+        return None
+
+    skip_patterns = ("mailer-daemon@", "postmaster@", "noreply@", "no-reply@")
+
+    for msg in thread.get("messages", []):
+        headers  = msg.get("payload", {}).get("headers", [])
+        from_hdr = _get_header(headers, "From")
+        sender_name, sender_email = _parse_sender(from_hdr)
+        sender_lower = sender_email.lower()
+
+        # Skip our own outbound messages
+        if sender_lower == GMAIL_USER_EMAIL.lower():
+            continue
+
+        # Skip delivery failure / bounce addresses
+        if any(sender_lower.startswith(p) for p in skip_patterns):
+            logger.debug("Skipping bounce/daemon message from %s in thread %s", sender_email, thread_id)
+            continue
+
+        # If a specific sender is expected, enforce it
+        if expected_sender and sender_lower != expected_sender.lower():
+            logger.debug(
+                "Skipping message from %s — expected %s in thread %s",
+                sender_email, expected_sender, thread_id,
+            )
+            continue
+
+        subject    = _get_header(headers, "Subject")
+        message_id = _get_header(headers, "Message-ID")
+        body       = _decode_body(msg.get("payload", {}))
+
+        logger.info(
+            "fetch_thread_reply: found reply in thread %s from %s",
+            thread_id, sender_email,
+        )
+        return {
+            "id":           msg["id"],
+            "thread_id":    thread_id,
+            "message_id":   message_id,
+            "subject":      subject,
+            "body":         body,
+            "sender_name":  sender_name,
+            "sender_email": sender_email,
+        }
+
+    return None
 
 
 def mark_email_as_read(message_id: str) -> None:
