@@ -39,6 +39,7 @@ from sheets_client import (
     get_pending_by_thread,
     get_awaiting_super_rows,
     update_pending_status,
+    set_review_flag,
 )
 from agents.email_parser import parse_email, build_acknowledgment
 from agents.router import (
@@ -151,6 +152,51 @@ def run_cycle1(
     logger.info("Cycle 1 complete — Pending row %s written.", pending_row)
 
 
+def classify_sender(sender_email: str) -> str:
+    """
+    Classifies the sender of an incoming email against known super emails.
+
+    Compares sender_email against the super_email field of every building
+    in the Buildings tab:
+
+      "super_exact"  — exact case-insensitive match with a known super email
+      "super_fuzzy"  — domain matches a known super's domain but address differs
+                       (e.g. newperson@hudsonarms.com when super is super@hudsonarms.com)
+      "tenant"       — no match; treat as a normal tenant request
+
+    Returns "tenant" on any lookup error so the pipeline is never blocked.
+
+    Args:
+        sender_email: The From address of the incoming email.
+
+    Returns:
+        One of: "super_exact", "super_fuzzy", "tenant".
+    """
+    from sheets_client import _read_tab
+    from config import GOOGLE_BUILDINGS_SHEET
+
+    sender_lower = sender_email.strip().lower()
+    sender_domain = sender_lower.split("@")[-1] if "@" in sender_lower else ""
+
+    try:
+        buildings = _read_tab(GOOGLE_BUILDINGS_SHEET)
+    except Exception as e:
+        logger.warning("classify_sender: could not read Buildings tab: %s", e)
+        return "tenant"
+
+    for b in buildings:
+        super_email = (b.get("super_email") or "").strip().lower()
+        if not super_email:
+            continue
+        if sender_lower == super_email:
+            return "super_exact"
+        super_domain = super_email.split("@")[-1] if "@" in super_email else ""
+        if super_domain and sender_domain == super_domain:
+            return "super_fuzzy"
+
+    return "tenant"
+
+
 def process_tenant_request(email: dict) -> None:
     """
     Full Cycle 1 pipeline for a new tenant email.
@@ -181,9 +227,32 @@ def process_tenant_request(email: dict) -> None:
         mark_email_as_read(msg_id)
         return
 
+    # ── Phase 1: Classify sender (fuzzy super detection) ─────────────────────
+    sender_class = classify_sender(sender)
+    logger.info("classify_sender: %s → %r", sender, sender_class)
+    if sender_class == "super_exact":
+        # Super emailed directly — not a tenant request; skip
+        logger.info("Skipping %r — sender is a known super (%s).", subject, sender)
+        mark_email_as_read(msg_id)
+        return
+
     # ── Phase 1: Log to Tenant Requests tab ──────────────────────────────────
+    parsed["thread_id"]   = email.get("thread_id") or ""
+    parsed["review_flag"] = "NEEDS_REVIEW" if sender_class == "super_fuzzy" else ""
     row_number = append_row(parsed)
     logger.info("Logged to Tenant Requests (row %s).", row_number)
+
+    if sender_class == "super_fuzzy" and row_number:
+        logger.warning(
+            "classify_sender: fuzzy super match for %s — row %s flagged NEEDS_REVIEW.",
+            sender, row_number,
+        )
+        # review_flag is already written inline by append_row via parsed["review_flag"]
+        # set_review_flag() is a belt-and-suspenders write in case append_row is racing
+        try:
+            set_review_flag(row_number, "NEEDS_REVIEW")
+        except Exception as e:
+            logger.error("set_review_flag failed for row %s: %s", row_number, e)
 
     # ── Phase 1: Conditional ACK — only for High urgency ─────────────────────
     urgency = (parsed.get("urgency") or "Low").strip()

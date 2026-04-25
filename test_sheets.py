@@ -13,6 +13,8 @@ TEST_ROW = {
     "issue_type": "Maintenance",
     "issue_description": "Test row — safe to delete.",
     "urgency": "Low",
+    "thread_id": "",       # O — blank for test rows
+    "review_flag": "",     # P — blank for test rows
 }
 
 if __name__ == "__main__":

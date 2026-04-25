@@ -32,23 +32,25 @@ logger = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# ── Tenant Requests tab columns (A–N) ────────────────────────────────────────
-# Phase 1: A–I  |  Phase 2: J–N
+# ── Tenant Requests tab columns (A–P) ────────────────────────────────────────
+# Phase 1: A–I  |  Phase 2: J–N  |  Threading: O  |  Review: P
 COLUMNS = [
-    "Timestamp",            # A
-    "Tenant Name",          # B
-    "Tenant Email",         # C
-    "Building Address",     # D
-    "Unit",                 # E
-    "Issue Type",           # F
-    "Description",          # G
-    "Urgency",              # H
-    "Status",               # I
-    "Vendor Assigned",      # J
-    "Vendor Email",         # K
-    "Vendor Contact Method",# L
-    "Super Notified",       # M
-    "Approval Required",    # N
+    "Timestamp",            # A  [0]
+    "Tenant Name",          # B  [1]
+    "Tenant Email",         # C  [2]
+    "Building Address",     # D  [3]
+    "Unit",                 # E  [4]
+    "Issue Type",           # F  [5]
+    "Description",          # G  [6]
+    "Urgency",              # H  [7]
+    "Status",               # I  [8]
+    "Vendor Assigned",      # J  [9]
+    "Vendor Email",         # K  [10]
+    "Vendor Contact Method",# L  [11]
+    "Super Notified",       # M  [12]
+    "Approval Required",    # N  [13]
+    "thread_id",            # O  [14] — Gmail thread ID for dashboard email viewer
+    "review_flag",          # P  [15] — NEEDS_REVIEW if sender classification is fuzzy
 ]
 
 # ── Buildings tab expected headers (row 1) ────────────────────────────────────
@@ -124,10 +126,25 @@ def append_row(parsed: dict) -> int | None:
         parsed.get("issue_description") or "",
         parsed.get("urgency") or "",
         "Open",
+        "",  # J Vendor Assigned   — filled by Cycle 2
+        "",  # K Vendor Email
+        "",  # L Vendor Contact Method
+        "",  # M Super Notified
+        "",  # N Approval Required
+        parsed.get("thread_id") or "",     # O [14] thread_id
+        parsed.get("review_flag") or "",   # P [15] review_flag
     ]
 
     service = get_sheets_service()
     range_name = f"{GOOGLE_SHEET_NAME}!A1"
+
+    logger.info(
+        "append_row: writing %d values — thread_id[14]=%r review_flag[15]=%r full_row=%r",
+        len(row),
+        row[14] if len(row) > 14 else "MISSING",
+        row[15] if len(row) > 15 else "MISSING",
+        row,
+    )
 
     try:
         response = service.spreadsheets().values().append(
@@ -553,4 +570,31 @@ def update_row(row_number: int, fields: dict) -> None:
         logger.info("Updated Phase 2 fields for row %d: %s", row_number, list(fields.keys()))
     except HttpError as e:
         logger.error("Failed to update row %d: %s", row_number, e)
+        raise
+
+
+def set_review_flag(row_number: int, flag: str = "NEEDS_REVIEW") -> None:
+    """
+    Writes a review flag to column P (review_flag) of a Tenant Requests row.
+
+    Called when classify_sender() returns "super_fuzzy" — the email was
+    treated as a tenant request but the sender address resembles a known
+    super's domain, warranting manual review.
+
+    Args:
+        row_number: 1-based row number in the Tenant Requests tab.
+        flag: Value to write — defaults to "NEEDS_REVIEW". Pass "" to clear.
+    """
+    service = get_sheets_service()
+    range_ = f"{GOOGLE_SHEET_NAME}!P{row_number}"
+    try:
+        service.spreadsheets().values().update(
+            spreadsheetId=GOOGLE_SPREADSHEET_ID,
+            range=range_,
+            valueInputOption="USER_ENTERED",
+            body={"values": [[flag]]},
+        ).execute()
+        logger.info("set_review_flag: row %d → %r (column P)", row_number, flag)
+    except HttpError as e:
+        logger.error("Failed to set review_flag on row %d: %s", row_number, e)
         raise

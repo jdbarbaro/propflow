@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PropFlow — Mission Control</title>
+  <style>
+    /* ── Design tokens ───────────────────────────────────────────────────── */
+    :root {
+      --bg:           #0f1117;
+      --surface:      #1a1d27;
+      --surface2:     #222637;
+      --border:       #2e3148;
+      --text:         #e8eaf0;
+      --text-muted:   #7c82a0;
+      --text-dim:     #4a4f6a;
+
+      --green:        #22c55e;
+      --green-bg:     #14532d22;
+      --green-border: #16a34a44;
+
+      --amber:        #f59e0b;
+      --amber-bg:     #78350f22;
+      --amber-border: #d9770644;
+
+      --red:          #ef4444;
+      --red-bg:       #7f1d1d22;
+      --red-border:   #dc262644;
+
+      --blue:         #3b82f6;
+      --blue-bg:      #1e3a5f22;
+      --blue-border:  #2563eb44;
+
+      --pink:         #ec4899;
+      --pink-bg:      #4c044422;
+      --pink-border:  #db277744;
+
+      --teal:         #14b8a6;
+      --teal-bg:      #0f3d38;
+      --teal-border:  #0d9488;
+
+      --yellow:        #eab308;
+      --yellow-bg:     #42390022;
+      --yellow-border: #a16207aa;
+
+      --radius:       10px;
+      --radius-sm:    6px;
+
+      --panel-width:  440px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ─────────────────────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 16px; }
+    .topbar h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+    .topbar h1 span { color: var(--text-muted); font-weight: 400; }
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--green);
+      background: var(--green-bg); border: 1px solid var(--green-border);
+      border-radius: 20px; padding: 3px 10px;
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green); animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    .topbar-right { font-size: 12px; color: var(--text-muted); }
+
+    /* ── Main content — shrinks when panel is open ───────────────────────── */
+    .layout {
+      display: flex;
+      min-height: calc(100vh - 53px);
+      transition: padding-right 0.3s ease;
+    }
+    .layout.panel-open { padding-right: var(--panel-width); }
+
+    .main {
+      flex: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      width: 100%;
+    }
+
+    /* ── Section headers ─────────────────────────────────────────────────── */
+    .section-title {
+      font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px;
+    }
+
+    /* ── Metric cards ────────────────────────────────────────────────────── */
+    .metrics-grid {
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 16px;
+    }
+    @media (max-width:900px) { .metrics-grid { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width:480px) { .metrics-grid { grid-template-columns: 1fr; } }
+
+    .metric-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 22px; transition: border-color 0.2s;
+    }
+    .metric-card.amber { border-color:var(--amber-border); background:var(--amber-bg); }
+    .metric-card.red   { border-color:var(--red-border);   background:var(--red-bg); }
+    .metric-card.green { border-color:var(--green-border);  background:var(--green-bg); }
+    .metric-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+    .metric-value { font-size: 36px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+    .metric-card.amber .metric-value { color: var(--amber); }
+    .metric-card.red   .metric-value { color: var(--red); }
+    .metric-card.green .metric-value { color: var(--green); }
+    .metric-sub { font-size: 12px; color: var(--text-muted); }
+
+    /* ── Pipeline bar ────────────────────────────────────────────────────── */
+    .pipeline-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 24px;
+    }
+    .pipeline-stages { display: flex; align-items: stretch; gap: 0; margin-top: 4px; }
+    .pipeline-stage {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      gap: 6px; position: relative;
+    }
+    .pipeline-stage:not(:last-child)::after {
+      content: "→"; position: absolute; right: -10px; top: 8px;
+      color: var(--text-dim); font-size: 16px; z-index: 1;
+    }
+    .pipeline-count { font-size: 28px; font-weight: 700; color: var(--text); }
+    .pipeline-count.has-items { color: var(--blue); }
+    .pipeline-label { font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.3; }
+    .pipeline-bar-fill { width:100%; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+    .pipeline-bar-inner { height:100%; background:var(--blue); border-radius:2px; transition:width 0.6s ease; }
+    @media(max-width:600px) { .pipeline-stages { flex-wrap:wrap; gap:12px; } .pipeline-stage::after { display:none; } }
+
+    /* ── Two-column ──────────────────────────────────────────────────────── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media(max-width:800px) { .two-col { grid-template-columns: 1fr; } }
+
+    .panel-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    /* ── Attention cards ─────────────────────────────────────────────────── */
+    .attention-item {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 6px;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .attention-item:hover { border-color: var(--blue); background: #1e2235; }
+    .attention-item.urgent { border-left: 3px solid var(--red); }
+    .attention-item.medium { border-left: 3px solid var(--amber); }
+    .attention-item.low    { border-left: 3px solid var(--blue); }
+    .attention-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .attention-address { font-size: 13px; font-weight: 600; color: var(--text); }
+    .attention-meta { font-size: 12px; color: var(--text-muted); }
+    .escalation-timer { font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .escalation-timer.overdue { color: var(--red); }
+    .escalation-timer.soon    { color: var(--amber); }
+    .escalation-timer.ok      { color: var(--green); }
+    .escalation-timer.none    { color: var(--text-dim); }
+
+    /* ── Recent activity ─────────────────────────────────────────────────── */
+    .activity-item {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding-bottom: 12px; border-bottom: 1px solid var(--border);
+      cursor: pointer; border-radius: var(--radius-sm);
+      transition: background 0.15s; padding: 8px;
+      margin: 0 -8px;
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-item:hover { background: var(--surface2); }
+    .activity-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      margin-top: 5px; flex-shrink: 0;
+    }
+    .activity-dot.green { background: var(--green); }
+    .activity-dot.blue  { background: var(--blue); }
+    .activity-dot.pink  { background: var(--pink); }
+    .activity-body { flex: 1; }
+    .activity-title { font-size: 13px; font-weight: 500; }
+    .activity-sub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .activity-time  { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+
+    /* ── Requests table ──────────────────────────────────────────────────── */
+    .table-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .table-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px;
+    }
+    .filter-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+    .filter-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text-muted); cursor: pointer;
+      font-size: 12px; padding: 5px 12px; transition: all 0.15s;
+    }
+    .filter-btn:hover  { border-color: var(--blue); color: var(--text); }
+    .filter-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: var(--surface2); border-bottom: 1px solid var(--border);
+      color: var(--text-muted); font-size: 11px; font-weight: 600;
+      letter-spacing: 0.05em; padding: 10px 16px; text-align: left;
+      text-transform: uppercase; white-space: nowrap;
+    }
+    td { border-bottom: 1px solid var(--border); color: var(--text); font-size: 13px; padding: 11px 16px; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr { cursor: pointer; transition: background 0.1s; }
+    tbody tr:hover td { background: var(--surface2); }
+    tbody tr.selected td { background: #1e2a3a; }
+
+    .td-address .street { font-weight: 500; }
+    .td-desc { max-width: 180px; color: var(--text-muted); font-size: 12px; }
+    .td-tenant .name  { font-weight: 500; }
+    .td-tenant .email { font-size: 11px; color: var(--text-muted); }
+    .td-time { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+    /* ── Badges ──────────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block; border-radius: 4px; font-size: 11px;
+      font-weight: 600; padding: 2px 8px; white-space: nowrap;
+    }
+    .badge-red    { background:var(--red-bg);    color:var(--red);    border:1px solid var(--red-border); }
+    .badge-amber  { background:var(--amber-bg);  color:var(--amber);  border:1px solid var(--amber-border); }
+    .badge-green  { background:var(--green-bg);  color:var(--green);  border:1px solid var(--green-border); }
+    .badge-blue   { background:var(--blue-bg);   color:var(--blue);   border:1px solid var(--blue-border); }
+    .badge-pink   { background:var(--pink-bg);   color:var(--pink);   border:1px solid var(--pink-border); }
+    .badge-muted   { background:var(--surface2);  color:var(--text-muted); border:1px solid var(--border); }
+    .badge-yellow  { background:var(--yellow-bg); color:var(--yellow);     border:1px solid var(--yellow-border); }
+
+    /* Row highlight for NEEDS_REVIEW */
+    tbody tr.needs-review td { background: #2a2500 !important; }
+    tbody tr.needs-review:hover td { background: #332d00 !important; }
+    tbody tr.needs-review.selected td { background: #3a3200 !important; }
+
+    /* ── Empty / loading ─────────────────────────────────────────────────── */
+    .empty-state { padding: 32px; text-align: center; color: var(--text-muted); font-size: 13px; }
+    .loading { color: var(--text-dim); font-size: 13px; }
+
+    /* ── Error banner ────────────────────────────────────────────────────── */
+    #error-banner {
+      display: none; background: var(--red-bg); border: 1px solid var(--red-border);
+      border-radius: var(--radius-sm); color: var(--red); font-size: 13px; padding: 10px 16px;
+    }
+
+    /* ── Thread slide-out panel ──────────────────────────────────────────── */
+    .thread-panel {
+      position: fixed; top: 53px; right: 0; bottom: 0;
+      width: var(--panel-width); max-width: 100vw;
+      background: var(--surface); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      transform: translateX(100%); transition: transform 0.3s ease;
+      z-index: 150; overflow: hidden;
+    }
+    .thread-panel.open { transform: translateX(0); }
+
+    /* Mobile: full width */
+    @media(max-width:600px) {
+      .thread-panel { width: 100vw; top: 53px; }
+      .layout.panel-open { padding-right: 0; }
+    }
+
+    .thread-panel-header {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 16px 18px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .thread-close-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text-muted); cursor: pointer;
+      font-size: 16px; line-height: 1; padding: 4px 9px;
+      transition: all 0.15s; flex-shrink: 0;
+    }
+    .thread-close-btn:hover { border-color: var(--red); color: var(--red); }
+    .thread-ticket-info { flex: 1; min-width: 0; }
+    .thread-ticket-address { font-size: 14px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .thread-ticket-meta { font-size: 12px; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .thread-messages {
+      flex: 1; overflow-y: auto; padding: 16px 18px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    /* ── Email bubbles ────────────────────────────────────────────────────── */
+    .msg-bubble {
+      max-width: 90%; display: flex; flex-direction: column; gap: 4px;
+    }
+    .msg-bubble.propflow { align-self: flex-end; }
+    .msg-bubble.external { align-self: flex-start; }
+
+    .msg-meta {
+      font-size: 11px; color: var(--text-dim);
+      display: flex; gap: 6px; align-items: baseline;
+    }
+    .msg-bubble.propflow .msg-meta { justify-content: flex-end; }
+    .msg-sender { font-weight: 600; color: var(--text-muted); }
+
+    .msg-body {
+      border-radius: 12px; padding: 10px 14px;
+      font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+    }
+    .msg-bubble.propflow .msg-body {
+      background: var(--teal-bg); border: 1px solid var(--teal-border);
+      color: var(--text); border-bottom-right-radius: 3px;
+    }
+    .msg-bubble.external .msg-body {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-bottom-left-radius: 3px;
+    }
+
+    .thread-loading { padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px; }
+    .thread-error   { padding: 16px; color: var(--red); font-size: 13px; }
+    .thread-empty   { padding: 24px; text-align: center; color: var(--text-dim); font-size: 13px; }
+
+    .thread-section-label {
+      font-size: 11px; color: var(--text-dim); text-align: center;
+      padding: 8px 0; border-top: 1px solid var(--border); margin: 8px 0;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .thread-section-label.first { border-top: none; margin-top: 0; }
+
+    /* ── Backdrop (mobile only) ──────────────────────────────────────────── */
+    #thread-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 140;
+    }
+    @media(max-width:600px) { #thread-backdrop.show { display: block; } }
+  </style>
+</head>
+<body>
+
+<!-- ── Top bar ─────────────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="topbar-left">
+    <h1>PropFlow <span>— Mission Control</span></h1>
+    <div class="live-badge"><div class="live-dot"></div>Live</div>
+  </div>
+  <div class="topbar-right" id="last-updated">Connecting…</div>
+</header>
+
+<!-- ── Backdrop ────────────────────────────────────────────────────────────── -->
+<div id="thread-backdrop" onclick="closeThread()"></div>
+
+<!-- ── Thread slide-out panel ──────────────────────────────────────────────── -->
+<div id="thread-panel" class="thread-panel">
+  <div class="thread-panel-header">
+    <button class="thread-close-btn" onclick="closeThread()" title="Close (Esc)">✕</button>
+    <div class="thread-ticket-info">
+      <div class="thread-ticket-address" id="thread-address">—</div>
+      <div class="thread-ticket-meta" id="thread-meta"></div>
+    </div>
+  </div>
+  <div class="thread-messages" id="thread-messages">
+    <div class="thread-empty">Select a request to view its email thread.</div>
+  </div>
+</div>
+
+<!-- ── Layout wrapper ───────────────────────────────────────────────────────── -->
+<div class="layout" id="layout">
+<div class="main">
+
+  <div id="error-banner"></div>
+
+  <!-- Metric cards -->
+  <div>
+    <div class="section-title">Overview</div>
+    <div class="metrics-grid">
+      <div class="metric-card" id="card-open">
+        <div class="metric-label">Open Requests</div>
+        <div class="metric-value" id="m-open">—</div>
+        <div class="metric-sub" id="m-wait">avg wait —</div>
+      </div>
+      <div class="metric-card" id="card-awaiting">
+        <div class="metric-label">Awaiting Super</div>
+        <div class="metric-value" id="m-awaiting">—</div>
+        <div class="metric-sub">pending approval</div>
+      </div>
+      <div class="metric-card" id="card-emergencies">
+        <div class="metric-label">Emergencies</div>
+        <div class="metric-value" id="m-emergencies">—</div>
+        <div class="metric-sub">high urgency open</div>
+      </div>
+      <div class="metric-card green">
+        <div class="metric-label">Resolved Today</div>
+        <div class="metric-value" id="m-resolved">—</div>
+        <div class="metric-sub">closed this calendar day</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pipeline -->
+  <div class="pipeline-card">
+    <div class="section-title">Pipeline</div>
+    <div class="pipeline-stages" id="pipeline-stages"></div>
+  </div>
+
+  <!-- Two-column -->
+  <div class="two-col">
+    <div class="panel-card">
+      <div class="section-title">Needs Attention</div>
+      <div id="attention-list"><p class="loading">Loading…</p></div>
+    </div>
+    <div class="panel-card">
+      <div class="section-title">Recent Activity</div>
+      <div id="activity-list"><p class="loading">Loading…</p></div>
+    </div>
+  </div>
+
+  <!-- Requests table -->
+  <div class="table-card">
+    <div class="table-header">
+      <div class="section-title" style="margin:0">All Requests</div>
+      <div class="filter-buttons" id="filter-buttons">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="high">Emergency</button>
+        <button class="filter-btn" data-filter="awaiting super">Awaiting Super</button>
+        <button class="filter-btn" data-filter="vendor dispatched">Dispatched</button>
+        <button class="filter-btn" data-filter="in-house">In-House</button>
+        <button class="filter-btn" data-filter="escalated">Escalated</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="requests-table">
+        <thead>
+          <tr>
+            <th>Building</th>
+            <th>Issue</th>
+            <th>Tenant</th>
+            <th>Urgency</th>
+            <th>Status</th>
+            <th>Vendor</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody id="requests-tbody">
+          <tr><td colspan="7" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+/* ── State ───────────────────────────────────────────────────────────────── */
+let _requests       = [];
+let _pending        = [];
+let _filteredRows   = [];   // rows currently visible in table
+let _selectedIdx    = -1;   // keyboard nav index
+let _activeFilter   = "all";
+let _lastFetch      = null;
+let _secondsTimer   = null;
+let _panelOpen      = false;
+
+/* ── DOM helpers ─────────────────────────────────────────────────────────── */
+function el(id) { return document.getElementById(id); }
+
+/* ── Formatting ──────────────────────────────────────────────────────────── */
+function statusBadge(status) {
+  const s = (status || "").toLowerCase();
+  if (s === "open")              return `<span class="badge badge-muted">Open</span>`;
+  if (s === "awaiting super")    return `<span class="badge badge-amber">Awaiting Super</span>`;
+  if (s === "vendor dispatched") return `<span class="badge badge-green">Dispatched</span>`;
+  if (s === "in-house")          return `<span class="badge badge-blue">In-House</span>`;
+  if (s === "escalated")         return `<span class="badge badge-pink">Escalated</span>`;
+  if (s === "needs review")      return `<span class="badge badge-amber">Needs Review</span>`;
+  if (["resolved","closed"].includes(s)) return `<span class="badge badge-green">Resolved</span>`;
+  return `<span class="badge badge-muted">${esc(status)}</span>`;
+}
+function urgencyBadge(u) {
+  const ul = (u || "").toLowerCase();
+  if (ul === "high")   return `<span class="badge badge-red">High</span>`;
+  if (ul === "medium") return `<span class="badge badge-amber">Medium</span>`;
+  if (ul === "low")    return `<span class="badge badge-blue">Low</span>`;
+  return `<span class="badge badge-muted">${esc(u)}</span>`;
+}
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function relTime(tsStr) {
+  if (!tsStr) return "—";
+  const cleaned = tsStr.replace(" UTC","Z").replace(" ","T");
+  const d = new Date(cleaned);
+  if (isNaN(d)) return tsStr;
+  const m = Math.floor((Date.now()-d)/60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m/60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}
+function shortAddr(a) {
+  if (!a) return "—";
+  const i = a.indexOf(",");
+  return i>0 ? a.slice(0,i) : a.slice(0,40);
+}
+function escalationLabel(mins) {
+  if (mins === null || mins === undefined) return {text:"No deadline", cls:"none"};
+  if (mins < 0) return {text:`Overdue ${Math.abs(mins)}m`, cls:"overdue"};
+  if (mins < 60) return {text:`${mins}m left`, cls:"soon"};
+  return {text:`${Math.floor(mins/60)}h ${mins%60}m left`, cls:"ok"};
+}
+
+/* ── API fetch ───────────────────────────────────────────────────────────── */
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${url} → ${r.status}`);
+  return r.json();
+}
+function showError(msg) { const b=el("error-banner"); b.textContent="⚠ "+msg; b.style.display="block"; }
+function clearError()   { el("error-banner").style.display="none"; }
+
+/* ── Render: metrics ─────────────────────────────────────────────────────── */
+function renderMetrics(m) {
+  el("m-open").textContent        = m.open_requests;
+  el("m-awaiting").textContent    = m.awaiting_super;
+  el("m-emergencies").textContent = m.emergencies;
+  el("m-resolved").textContent    = m.resolved_today;
+  el("m-wait").textContent        = `avg wait ${m.avg_wait_hours}h`;
+  el("card-awaiting").className    = "metric-card"+(m.awaiting_super>0?" amber":"");
+  el("card-emergencies").className = "metric-card"+(m.emergencies>0?" red":"");
+}
+
+/* ── Render: pipeline ────────────────────────────────────────────────────── */
+function renderPipeline(p) {
+  const stages = [
+    {key:"received",          label:"Received"},
+    {key:"super_notified",    label:"Super\nNotified"},
+    {key:"awaiting_reply",    label:"Awaiting\nReply"},
+    {key:"vendor_dispatched", label:"Vendor\nDispatched"},
+    {key:"escalated",         label:"Escalated"},
+    {key:"in_house",          label:"In-House"},
+  ];
+  const max = Math.max(...stages.map(s=>p[s.key]||0),1);
+  el("pipeline-stages").innerHTML = stages.map(s => {
+    const c = p[s.key]||0, pct=Math.round(c/max*100), cls=c>0?"has-items":"";
+    return `<div class="pipeline-stage">
+      <div class="pipeline-count ${cls}">${c}</div>
+      <div class="pipeline-bar-fill"><div class="pipeline-bar-inner" style="width:${pct}%"></div></div>
+      <div class="pipeline-label">${esc(s.label)}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ── Render: attention ───────────────────────────────────────────────────── */
+function renderAttention(pending) {
+  const container = el("attention-list");
+  const items = pending.filter(r => {
+    const s=(r.status||"").toLowerCase();
+    return s==="awaiting super"||s==="escalated"||s==="needs review";
+  }).slice(0,6);
+
+  if (!items.length) {
+    container.innerHTML=`<div class="empty-state">All clear — nothing needs attention.</div>`;
+    return;
+  }
+  // Store pending items for onclick reference
+  window._attentionItems = items;
+  container.innerHTML = items.map((r, i) => {
+    const urg=(r.urgency||"").toLowerCase();
+    const cls=urg==="high"?"urgent":urg==="medium"?"medium":"low";
+    const esc_=escalationLabel(r.escalates_in_minutes);
+    return `<div class="attention-item ${cls}" onclick="openPendingItem(${i})">
+      <div class="attention-top">
+        <div>
+          <div class="attention-address">${esc(shortAddr(r.building_address))}</div>
+          <div class="attention-meta">${esc(r.issue_type)} · Unit ${esc(r.unit_number)} · ${esc(r.tenant_name||r.tenant_email)}</div>
+        </div>
+        <div class="escalation-timer ${esc_.cls}">${esc_.text}</div>
+      </div>
+      <div>${statusBadge(r.status)} ${urgencyBadge(r.urgency)}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ── Render: activity ────────────────────────────────────────────────────── */
+function renderActivity(requests) {
+  const container = el("activity-list");
+  const done = requests.filter(r => {
+    const s=(r.status||"").toLowerCase();
+    return ["in-house","vendor dispatched","resolved","closed","escalated"].includes(s);
+  }).slice(0,5);
+
+  if (!done.length) { container.innerHTML=`<div class="empty-state">No resolved requests yet.</div>`; return; }
+  window._activityItems = done;
+  container.innerHTML = done.map((r, i) => {
+    const s=(r.status||"").toLowerCase();
+    let dotCls="blue";
+    if(["in-house","resolved","closed"].includes(s)) dotCls="green";
+    if(s==="escalated") dotCls="pink";
+    return `<div class="activity-item" onclick="openActivityItem(${i})">
+      <div class="activity-dot ${dotCls}"></div>
+      <div class="activity-body">
+        <div class="activity-title">${esc(r.issue_type)} — ${esc(shortAddr(r.building_address))}</div>
+        <div class="activity-sub">${statusBadge(r.status)} · ${esc(r.tenant_name||r.tenant_email)}</div>
+      </div>
+      <div class="activity-time">${relTime(r.timestamp)}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ── Render: table ───────────────────────────────────────────────────────── */
+function renderTable(requests, filter) {
+  const tbody = el("requests-tbody");
+  let rows = requests;
+  if (filter==="high")            rows = requests.filter(r=>r.urgency.toLowerCase()==="high");
+  else if (filter!=="all")        rows = requests.filter(r=>r.status.toLowerCase()===filter);
+  _filteredRows = rows;
+  _selectedIdx  = -1;
+
+  if (!rows.length) {
+    tbody.innerHTML=`<tr><td colspan="7" class="empty-state">No requests match this filter.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map((r,i) => {
+    const tid = esc(r.thread_id||"");
+    const needsReview = (r.review_flag||"").toUpperCase() === "NEEDS_REVIEW";
+    const reviewBadge = needsReview ? ` <span class="badge badge-yellow">⚑ Review</span>` : "";
+    return `<tr data-idx="${i}" data-tid="${tid}" onclick="openThreadFromRow(${i})"${needsReview?' class="needs-review"':''}>
+      <td class="td-address"><div class="street">${esc(shortAddr(r.building_address))}</div></td>
+      <td>
+        <div>${esc(r.issue_type)}${reviewBadge}</div>
+        <div class="td-desc">${esc((r.issue_description||"").slice(0,60))}${(r.issue_description||"").length>60?"…":""}</div>
+      </td>
+      <td class="td-tenant">
+        <div class="name">${esc(r.tenant_name)}</div>
+        <div class="email">${esc(r.tenant_email)}</div>
+      </td>
+      <td>${urgencyBadge(r.urgency)}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${esc(r.vendor_assigned||"—")}</td>
+      <td class="td-time">${relTime(r.timestamp)}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ── Thread panel ────────────────────────────────────────────────────────── */
+function openPendingItem(i) {
+  const r = (window._attentionItems || [])[i];
+  if (!r) return;
+  // Pending rows: tenant_thread_id is the tenant thread, super_thread_id is the super thread
+  openThreadFromData(r.tenant_thread_id || "", r, r.super_thread_id || null);
+}
+
+function openActivityItem(i) {
+  const r = (window._activityItems || [])[i];
+  if (!r) return;
+  openThreadFromData(r.thread_id || "", r, r.super_thread_id || null);
+}
+
+function openThreadFromRow(idx) {
+  const r = _filteredRows[idx];
+  if (!r) return;
+  _selectedIdx = idx;
+  _updateRowSelection();
+  openThreadFromData(r.thread_id, r, r.super_thread_id || null);
+}
+
+function _renderMessages(messages) {
+  if (!messages.length) return `<div class="thread-empty">No messages found.</div>`;
+  return messages.map(m => {
+    const cls = m.is_propflow ? "propflow" : "external";
+    const sender = (m.from_name && m.from_name !== m.from) ? esc(m.from_name) : esc(m.from);
+    return `<div class="msg-bubble ${cls}">
+      <div class="msg-meta">
+        <span class="msg-sender">${sender}</span>
+        <span>${relTime(m.timestamp)}</span>
+      </div>
+      <div class="msg-body">${esc(m.body || "(no body)")}</div>
+    </div>`;
+  }).join("");
+}
+
+function openThreadFromData(thread_id, ticket, super_thread_id) {
+  // Update header
+  el("thread-address").textContent = shortAddr(ticket.building_address) || "—";
+  const isReview = (ticket.review_flag || "").toUpperCase() === "NEEDS_REVIEW";
+  el("thread-meta").innerHTML = [
+    urgencyBadge(ticket.urgency),
+    statusBadge(ticket.status),
+    isReview ? `<span class="badge badge-yellow">⚑ Needs Review — sender may be super</span>` : "",
+    ticket.issue_type ? `<span>${esc(ticket.issue_type)}</span>` : "",
+    (ticket.tenant_name || ticket.tenant_email) ? `<span>${esc(ticket.tenant_name || ticket.tenant_email)}</span>` : "",
+  ].filter(Boolean).join(" ");
+
+  // Open panel
+  el("thread-panel").classList.add("open");
+  el("layout").classList.add("panel-open");
+  el("thread-backdrop").classList.add("show");
+  _panelOpen = true;
+
+  const msgs = el("thread-messages");
+
+  // Build initial skeleton with loading states
+  const hasTenantThread  = !!thread_id;
+  const hasSuperThread   = !!super_thread_id;
+
+  msgs.innerHTML = `
+    <div class="thread-section-label first">── Tenant Request ──────────────────</div>
+    <div id="tenant-thread-content">${hasTenantThread
+      ? `<div class="thread-loading">Loading tenant thread…</div>`
+      : `<div class="thread-empty">No email thread linked to this request yet.</div>`
+    }</div>
+    ${hasSuperThread ? `
+      <div class="thread-section-label">── Superintendent Response ─────────</div>
+      <div id="super-thread-content"><div class="thread-loading">Loading superintendent thread…</div></div>
+    ` : ""}
+  `;
+
+  const fetches = [];
+
+  if (hasTenantThread) {
+    fetches.push(
+      fetchJSON(`/api/thread/${thread_id}`)
+        .then(data => {
+          const div = document.getElementById("tenant-thread-content");
+          if (!div) return;
+          if (data.error && !data.messages.length) {
+            div.innerHTML = `<div class="thread-error">Could not load thread: ${esc(data.error)}</div>`;
+          } else {
+            div.innerHTML = _renderMessages(data.messages);
+          }
+        })
+        .catch(err => {
+          const div = document.getElementById("tenant-thread-content");
+          if (div) div.innerHTML = `<div class="thread-error">Error: ${esc(err.message)}</div>`;
+        })
+    );
+  }
+
+  if (hasSuperThread) {
+    fetches.push(
+      fetchJSON(`/api/thread/${super_thread_id}`)
+        .then(data => {
+          const div = document.getElementById("super-thread-content");
+          if (!div) return;
+          if (data.error && !data.messages.length) {
+            div.innerHTML = `<div class="thread-error">Super thread unavailable: ${esc(data.error)}</div>`;
+          } else {
+            div.innerHTML = _renderMessages(data.messages);
+          }
+        })
+        .catch(() => {
+          const div = document.getElementById("super-thread-content");
+          if (div) div.innerHTML = `<div class="thread-error">Super thread unavailable</div>`;
+        })
+    );
+  }
+
+  // Scroll to bottom after all threads load
+  Promise.all(fetches).then(() => {
+    msgs.scrollTop = msgs.scrollHeight;
+  });
+}
+
+function closeThread() {
+  el("thread-panel").classList.remove("open");
+  el("layout").classList.remove("panel-open");
+  el("thread-backdrop").classList.remove("show");
+  _panelOpen = false;
+  _selectedIdx = -1;
+  _updateRowSelection();
+}
+
+function _updateRowSelection() {
+  document.querySelectorAll("#requests-tbody tr").forEach((tr,i) => {
+    tr.classList.toggle("selected", i === _selectedIdx);
+  });
+}
+
+/* ── Keyboard navigation ─────────────────────────────────────────────────── */
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { closeThread(); return; }
+
+  // Arrow nav only when focus not in an input
+  if (document.activeElement && ["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName)) return;
+
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    _selectedIdx = Math.min(_selectedIdx+1, _filteredRows.length-1);
+    _updateRowSelection();
+    _scrollRowIntoView();
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    _selectedIdx = Math.max(_selectedIdx-1, 0);
+    _updateRowSelection();
+    _scrollRowIntoView();
+  } else if (e.key === "Enter" && _selectedIdx >= 0) {
+    openThreadFromRow(_selectedIdx);
+  }
+});
+
+function _scrollRowIntoView() {
+  const tr = document.querySelector(`#requests-tbody tr[data-idx="${_selectedIdx}"]`);
+  if (tr) tr.scrollIntoView({block:"nearest"});
+}
+
+/* ── Filter buttons ──────────────────────────────────────────────────────── */
+el("filter-buttons").addEventListener("click", e => {
+  const btn = e.target.closest(".filter-btn");
+  if (!btn) return;
+  _activeFilter = btn.dataset.filter;
+  document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  renderTable(_requests, _activeFilter);
+  if (_panelOpen) closeThread();
+});
+
+/* ── Last-updated counter ────────────────────────────────────────────────── */
+function startSecondsTimer() {
+  if (_secondsTimer) clearInterval(_secondsTimer);
+  _secondsTimer = setInterval(() => {
+    if (!_lastFetch) return;
+    const sec = Math.floor((Date.now()-_lastFetch)/1000);
+    el("last-updated").textContent = `Last updated ${sec}s ago`;
+  }, 1000);
+}
+
+/* ── Main data fetch ─────────────────────────────────────────────────────── */
+async function fetchAll() {
+  try {
+    const [metrics, pipeline, requests, pending] = await Promise.all([
+      fetchJSON("/api/metrics"),
+      fetchJSON("/api/pipeline"),
+      fetchJSON("/api/requests"),
+      fetchJSON("/api/pending"),
+    ]);
+    clearError();
+    _requests = requests;
+    _pending  = pending;
+    _lastFetch = Date.now();
+    renderMetrics(metrics);
+    renderPipeline(pipeline);
+    renderAttention(pending);
+    renderActivity(requests);
+    renderTable(requests, _activeFilter);
+  } catch(err) {
+    showError("Could not reach the PropFlow API: "+err.message);
+  }
+}
+
+/* ── Boot ────────────────────────────────────────────────────────────────── */
+fetchAll();
+startSecondsTimer();
+setInterval(fetchAll, 60_000);
+</script>
+</body>
+</html>

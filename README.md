@@ -97,6 +97,46 @@ Set all other `.env` values as Railway environment variables, and set `DRY_RUN=f
 
 ---
 
+## Dashboard — Mission Control
+
+PropFlow includes a read-only web dashboard that shows live request data pulled
+from Google Sheets.
+
+### Run locally
+
+```bash
+pip install fastapi uvicorn
+uvicorn dashboard.main:app --reload --port 8000
+```
+
+Open [http://localhost:8000](http://localhost:8000) in your browser.
+
+### Endpoints
+
+| Endpoint | Description |
+|---|---|
+| `GET /` | Dashboard UI |
+| `GET /api/metrics` | Summary counts (open, awaiting, emergencies, resolved today) |
+| `GET /api/pipeline` | Counts per pipeline stage |
+| `GET /api/requests` | Last 100 tenant requests, newest first |
+| `GET /api/pending` | Open pending requests with escalation countdown |
+| `GET /health` | Health check |
+
+### Deploy on Railway
+
+The dashboard runs as a separate **web** process alongside the polling worker.
+The `Procfile` already defines both:
+
+```
+web:    uvicorn dashboard.main:app --host 0.0.0.0 --port $PORT
+worker: python main.py
+```
+
+The dashboard uses the same environment variables and `credentials.json` as the
+worker — no additional configuration needed.
+
+---
+
 ## Security Notes
 
 - Never commit `.env` or `credentials.json`. Both are in `.gitignore`.
