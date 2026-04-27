@@ -26,6 +26,21 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+# ── Railway credentials bootstrap ────────────────────────────────────────────
+# Must run BEFORE importing sheets_client or config, which load credentials.json
+# at import time on Railway.
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+_b64 = os.environ.get("GOOGLE_CREDENTIALS_B64")
+if _b64:
+    import base64 as _b64mod
+    _cred_path = os.path.join(_ROOT, "credentials.json")
+    with open(_cred_path, "wb") as _f:
+        _f.write(_b64mod.b64decode(_b64))
+    logger.info("credentials.json written from GOOGLE_CREDENTIALS_B64.")
+# ─────────────────────────────────────────────────────────────────────────────
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -36,21 +51,6 @@ from config import (
     GOOGLE_SPREADSHEET_ID, GOOGLE_SHEET_NAME, GOOGLE_PENDING_SHEET,
     GOOGLE_SHEETS_CREDENTIALS_FILE, GMAIL_USER_EMAIL,
 )
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# ── Railway credentials bootstrap ────────────────────────────────────────────
-# On Railway, credentials.json is not committed — it is base64-encoded in the
-# GOOGLE_CREDENTIALS_B64 env var and written to disk on startup.
-_b64 = os.environ.get("GOOGLE_CREDENTIALS_B64")
-if _b64:
-    import base64 as _b64mod
-    _cred_path = os.path.join(_ROOT, "credentials.json")
-    with open(_cred_path, "wb") as _f:
-        _f.write(_b64mod.b64decode(_b64))
-    logger.info("credentials.json written from GOOGLE_CREDENTIALS_B64.")
-# ─────────────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="PropFlow Mission Control", version="1.0.0")
 
