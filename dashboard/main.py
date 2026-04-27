@@ -222,6 +222,31 @@ def _minutes_until(raw: str) -> int | None:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+@app.get("/api/debug")
+def debug():
+    result = {
+        "spreadsheet_id": GOOGLE_SPREADSHEET_ID,
+        "sheet_name":     GOOGLE_SHEET_NAME,
+        "values":         None,
+        "error":          None,
+    }
+    logger.info("debug: spreadsheet_id=%r sheet_name=%r", GOOGLE_SPREADSHEET_ID, GOOGLE_SHEET_NAME)
+    try:
+        logger.info("debug: calling get_sheets_service()")
+        service = get_sheets_service()
+        logger.info("debug: sheets service OK — reading first 3 rows")
+        resp = service.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SPREADSHEET_ID,
+            range=f"{GOOGLE_SHEET_NAME}!A1:O3",
+        ).execute()
+        result["values"] = resp.get("values", [])
+        logger.info("debug: read OK — %d row(s) returned", len(result["values"]))
+    except Exception as e:
+        result["error"] = str(e)
+        logger.error("debug: sheets read failed — %s", e)
+    return result
+
+
 @app.get("/health")
 def health():
     return {
