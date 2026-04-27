@@ -37,7 +37,20 @@ from config import (
     GOOGLE_SHEETS_CREDENTIALS_FILE, GMAIL_USER_EMAIL,
 )
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ── Railway credentials bootstrap ────────────────────────────────────────────
+# On Railway, credentials.json is not committed — it is base64-encoded in the
+# GOOGLE_CREDENTIALS_B64 env var and written to disk on startup.
+_b64 = os.environ.get("GOOGLE_CREDENTIALS_B64")
+if _b64:
+    import base64 as _b64mod
+    _cred_path = os.path.join(_ROOT, "credentials.json")
+    with open(_cred_path, "wb") as _f:
+        _f.write(_b64mod.b64decode(_b64))
+    logger.info("credentials.json written from GOOGLE_CREDENTIALS_B64.")
+# ─────────────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="PropFlow Mission Control", version="1.0.0")
 
