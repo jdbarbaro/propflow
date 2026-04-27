@@ -224,13 +224,23 @@ def _minutes_until(raw: str) -> int | None:
 
 @app.get("/api/debug")
 def debug():
+    creds_file = os.getenv("GOOGLE_SHEETS_CREDENTIALS_FILE", "credentials.json")
     result = {
-        "spreadsheet_id": GOOGLE_SPREADSHEET_ID,
-        "sheet_name":     GOOGLE_SHEET_NAME,
-        "values":         None,
-        "error":          None,
+        "spreadsheet_id":        GOOGLE_SPREADSHEET_ID,
+        "sheet_name":            GOOGLE_SHEET_NAME,
+        "credentials_b64_set":   bool(os.getenv("GOOGLE_CREDENTIALS_B64")),
+        "credentials_file_exists": os.path.exists(creds_file),
+        "credentials_file_path": creds_file,
+        "cwd":                   os.getcwd(),
+        "root":                  _ROOT,
+        "values":                None,
+        "error":                 None,
     }
-    logger.info("debug: spreadsheet_id=%r sheet_name=%r", GOOGLE_SPREADSHEET_ID, GOOGLE_SHEET_NAME)
+    logger.info(
+        "debug: spreadsheet_id=%r sheet_name=%r cwd=%r credentials_b64_set=%s credentials_file_exists=%s",
+        GOOGLE_SPREADSHEET_ID, GOOGLE_SHEET_NAME, os.getcwd(),
+        result["credentials_b64_set"], result["credentials_file_exists"],
+    )
     try:
         logger.info("debug: calling get_sheets_service()")
         service = get_sheets_service()
