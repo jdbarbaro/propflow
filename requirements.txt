@@ -11,3 +11,5 @@ pypdf>=4.0.0
 
 # Environment variable loading
 python-dotenv>=1.0.1
+fastapi
+uvicorn
