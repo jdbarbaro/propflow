@@ -30,5 +30,12 @@ PROPFLOW_DRIVE_FOLDER = os.getenv("PROPFLOW_DRIVE_FOLDER", "PropFlow/Management 
 # PropFlow owner/operator email — used for escalation notifications
 PROPFLOW_OWNER_EMAIL = os.getenv("PROPFLOW_OWNER_EMAIL", "")
 
+# Google Calendar — PROPFLOW_CALENDAR_ID is the Railway env var name;
+# GOOGLE_CALENDAR_ID is the fallback for local .env compatibility.
+PROPFLOW_CALENDAR_ID = (
+    os.getenv("PROPFLOW_CALENDAR_ID")
+    or os.getenv("GOOGLE_CALENDAR_ID", "")
+)
+
 # Dry-run mode — print outbound emails to terminal instead of sending
 DRY_RUN = os.getenv("DRY_RUN", "true").lower() == "true"

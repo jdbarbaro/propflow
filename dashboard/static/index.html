@@ -356,6 +356,148 @@
       z-index: 140;
     }
     @media(max-width:600px) { #thread-backdrop.show { display: block; } }
+
+    /* ── Tab navigation ──────────────────────────────────────────────────── */
+    .tab-nav {
+      display: flex; gap: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 0 4px; margin-bottom: 24px;
+    }
+    .tab-btn {
+      background: none; border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted); cursor: pointer;
+      font-size: 13px; font-weight: 500;
+      padding: 10px 18px; margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--teal); border-bottom-color: var(--teal); }
+
+    /* ── Calendar nav ────────────────────────────────────────────────────── */
+    .cal-nav {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+    }
+    .cal-nav-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text-muted); cursor: pointer;
+      font-size: 13px; padding: 6px 14px; transition: all 0.15s;
+    }
+    .cal-nav-btn:hover { border-color: var(--teal); color: var(--teal); }
+    .cal-today-btn {
+      background: var(--teal-bg); border: 1px solid var(--teal-border);
+      border-radius: 6px; color: var(--teal); cursor: pointer;
+      font-size: 12px; padding: 6px 12px; transition: all 0.15s;
+    }
+    .cal-today-btn:hover { background: var(--teal); color: #fff; }
+    .cal-week-label {
+      flex: 1; text-align: center; font-size: 15px; font-weight: 600;
+    }
+
+    /* ── Calendar grid ───────────────────────────────────────────────────── */
+    .cal-container {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .cal-header-row {
+      display: flex; border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .cal-gutter    { width: 52px; flex-shrink: 0; border-right: 1px solid var(--border); }
+    .cal-day-headers {
+      flex: 1; display: grid; grid-template-columns: repeat(7,1fr);
+    }
+    .cal-day-hdr {
+      text-align: center; padding: 10px 4px;
+      border-right: 1px solid var(--border);
+    }
+    .cal-day-hdr:last-child { border-right: none; }
+    .cal-day-hdr .day-name {
+      color: var(--text-muted); font-size: 11px; font-weight: 600;
+      letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    .cal-day-hdr .day-num { font-size: 20px; font-weight: 700; margin-top: 2px; }
+    .cal-day-hdr.today .day-num { color: var(--teal); }
+
+    .cal-scroll { overflow-y: auto; max-height: 620px; }
+    .cal-inner  { display: flex; }
+
+    .cal-times {
+      width: 52px; flex-shrink: 0; border-right: 1px solid var(--border);
+    }
+    .cal-time-slot {
+      height: 60px; display: flex; align-items: flex-start;
+      justify-content: flex-end; padding: 4px 8px 0 0;
+      font-size: 11px; color: var(--text-dim);
+      border-bottom: 1px solid var(--border); box-sizing: border-box;
+    }
+    .cal-time-slot:last-child { border-bottom: none; }
+
+    .cal-days {
+      flex: 1; display: grid; grid-template-columns: repeat(7,1fr);
+    }
+    .cal-day-col {
+      position: relative; border-right: 1px solid var(--border);
+      min-height: 780px; /* 13 hours × 60px */
+    }
+    .cal-day-col:last-child { border-right: none; }
+    .cal-hour-line {
+      position: absolute; left: 0; right: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Calendar event blocks ───────────────────────────────────────────── */
+    .cal-event {
+      position: absolute; left: 2px; right: 2px;
+      border-radius: 4px; padding: 3px 6px;
+      font-size: 11px; font-weight: 500;
+      cursor: pointer; overflow: hidden; z-index: 1;
+      transition: filter 0.15s;
+    }
+    .cal-event:hover { filter: brightness(1.2); }
+    .cal-event.urgency-high   { background:var(--red-bg);   border:1px solid var(--red-border);   color:var(--red); }
+    .cal-event.urgency-medium { background:var(--amber-bg); border:1px solid var(--amber-border); color:var(--amber); }
+    .cal-event.urgency-low    { background:var(--green-bg); border:1px solid var(--green-border); color:var(--green); }
+    .cal-event-title { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cal-event-time  { font-size:10px; opacity:0.75; margin-top:1px; }
+
+    /* ── Calendar popup ──────────────────────────────────────────────────── */
+    .cal-popup {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 300; display: flex; align-items: center; justify-content: center;
+    }
+    .cal-popup-inner {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px 26px;
+      min-width: 300px; max-width: 460px; width: 90%;
+      position: relative;
+    }
+    .cal-popup-close {
+      position: absolute; top: 12px; right: 14px;
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 18px; line-height: 1;
+    }
+    .cal-popup-close:hover { color: var(--red); }
+    .cal-popup-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; padding-right: 24px; }
+    .cal-popup-row   { display: flex; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+    .cal-popup-label { color: var(--text-muted); min-width: 70px; flex-shrink: 0; }
+    .cal-popup-value { color: var(--text); flex: 1; }
+
+    /* ── Calendar empty state ────────────────────────────────────────────── */
+    .cal-empty {
+      padding: 40px 24px; text-align: center;
+      color: var(--text-muted); font-size: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-top: 8px;
+    }
+
+    /* ── Calendar mobile: horizontal scroll ──────────────────────────────── */
+    @media(max-width:700px) {
+      .cal-day-headers { grid-template-columns: repeat(7, minmax(48px,1fr)); }
+      .cal-days        { grid-template-columns: repeat(7, minmax(80px,1fr)); }
+      .cal-container   { overflow-x: auto; }
+    }
   </style>
 </head>
 <body>
@@ -390,7 +532,16 @@
 <div class="layout" id="layout">
 <div class="main">
 
+  <!-- Tab nav -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn"        data-tab="calendar" onclick="switchTab('calendar')">Calendar</button>
+  </nav>
+
   <div id="error-banner"></div>
+
+  <!-- ── Overview tab ──────────────────────────────────────────────────── -->
+  <div id="tab-overview">
 
   <!-- Metric cards -->
   <div>
@@ -469,6 +620,46 @@
       </table>
     </div>
   </div>
+
+  </div><!-- /tab-overview -->
+
+  <!-- ── Calendar tab ──────────────────────────────────────────────────── -->
+  <div id="tab-calendar" style="display:none">
+
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="calPrev()">← Prev</button>
+      <div class="cal-week-label" id="cal-week-label">—</div>
+      <button class="cal-today-btn" onclick="calToday()">Today</button>
+      <button class="cal-nav-btn" onclick="calNext()">Next →</button>
+    </div>
+
+    <div id="cal-container-wrap">
+      <div class="cal-container" id="cal-grid-container">
+        <div class="cal-header-row">
+          <div class="cal-gutter"></div>
+          <div class="cal-day-headers" id="cal-day-headers"></div>
+        </div>
+        <div class="cal-scroll">
+          <div class="cal-inner">
+            <div class="cal-times"  id="cal-times"></div>
+            <div class="cal-days"   id="cal-days"></div>
+          </div>
+        </div>
+      </div>
+      <div id="cal-empty-week" class="cal-empty" style="display:none">
+        No appointments scheduled this week.
+      </div>
+    </div>
+
+    <!-- Event detail popup -->
+    <div id="cal-popup" class="cal-popup" style="display:none" onclick="closeCalPopup()">
+      <div class="cal-popup-inner" onclick="event.stopPropagation()">
+        <button class="cal-popup-close" onclick="closeCalPopup()">✕</button>
+        <div id="cal-popup-content"></div>
+      </div>
+    </div>
+
+  </div><!-- /tab-calendar -->
 
 </div><!-- /main -->
 </div><!-- /layout -->
@@ -875,6 +1066,208 @@ async function fetchAll() {
 fetchAll();
 startSecondsTimer();
 setInterval(fetchAll, 60_000);
+
+/* ── Tab switching ───────────────────────────────────────────────────────── */
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab)
+  );
+  el('tab-overview').style.display = tab === 'overview' ? '' : 'none';
+  el('tab-calendar').style.display = tab === 'calendar' ? '' : 'none';
+  if (tab === 'calendar' && !_calLoaded) {
+    _calWeekStart = _getMonday(new Date());
+    fetchCalendar();
+  }
+}
+
+/* ── Calendar state ──────────────────────────────────────────────────────── */
+let _calWeekStart = null;
+let _calEvents    = [];
+let _calLoaded    = false;
+
+const CAL_START = 7;    // 7 AM
+const CAL_END   = 20;   // 8 PM  (13 hour slots)
+const HOUR_PX   = 60;   // px per hour
+
+/* ── Calendar helpers ────────────────────────────────────────────────────── */
+function _getMonday(d) {
+  const dt  = new Date(d);
+  const day = dt.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function _fmtTime(d) {
+  const h = d.getHours(), m = d.getMinutes();
+  const ampm = h < 12 ? 'am' : 'pm';
+  const h12  = h % 12 || 12;
+  return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2,'0')}${ampm}`;
+}
+
+function _parseDesc(desc) {
+  // Parse "Key: Value\nKey: Value" format from calendar event descriptions
+  const fields = {};
+  (desc || '').split('\n').forEach(line => {
+    const i = line.indexOf(':');
+    if (i > 0) fields[line.slice(0,i).trim()] = line.slice(i+1).trim();
+  });
+  return fields;
+}
+
+/* ── Week navigation ─────────────────────────────────────────────────────── */
+function calPrev()  { _calWeekStart.setDate(_calWeekStart.getDate()-7); renderCalendar(); }
+function calNext()  { _calWeekStart.setDate(_calWeekStart.getDate()+7); renderCalendar(); }
+function calToday() { _calWeekStart = _getMonday(new Date()); renderCalendar(); }
+
+/* ── Fetch calendar data ─────────────────────────────────────────────────── */
+async function fetchCalendar() {
+  el('cal-grid-container').style.opacity = '0.5';
+  try {
+    const data = await fetchJSON('/api/calendar');
+    _calEvents = data.events || [];
+    _calLoaded = true;
+    renderCalendar();
+  } catch(err) {
+    el('cal-empty-week').textContent = 'Could not load calendar: ' + err.message;
+    el('cal-empty-week').style.display = '';
+    el('cal-grid-container').style.display = 'none';
+  } finally {
+    el('cal-grid-container').style.opacity = '1';
+  }
+}
+
+/* ── Render the weekly calendar grid ─────────────────────────────────────── */
+function renderCalendar() {
+  if (!_calWeekStart) return;
+
+  const weekEnd = new Date(_calWeekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+
+  // Week label
+  const fmtOpts = { month:'short', day:'numeric' };
+  const endDay  = new Date(weekEnd); endDay.setDate(endDay.getDate()-1);
+  el('cal-week-label').textContent =
+    _calWeekStart.toLocaleDateString('en-US', fmtOpts) + ' – ' +
+    endDay.toLocaleDateString('en-US', fmtOpts);
+
+  // Filter events in this week
+  const weekEvents = _calEvents.filter(e => {
+    const d = new Date(e.start);
+    return d >= _calWeekStart && d < weekEnd;
+  });
+
+  // Time labels (7 AM … 7 PM = 13 slots)
+  let timesHtml = '';
+  for (let h = CAL_START; h < CAL_END; h++) {
+    const label = h === 12 ? '12 PM' : h < 12 ? `${h} AM` : `${h-12} PM`;
+    timesHtml += `<div class="cal-time-slot">${label}</div>`;
+  }
+  el('cal-times').innerHTML = timesHtml;
+
+  // Day columns
+  const today   = new Date(); today.setHours(0,0,0,0);
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  let headersHtml = '';
+  let daysHtml    = '';
+
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(_calWeekStart);
+    day.setDate(day.getDate() + i);
+    const isToday = day.getTime() === today.getTime();
+
+    headersHtml += `<div class="cal-day-hdr${isToday?' today':''}">
+      <div class="day-name">${dayNames[i]}</div>
+      <div class="day-num">${day.getDate()}</div>
+    </div>`;
+
+    // Hour grid lines
+    let linesHtml = '';
+    for (let h = 0; h < (CAL_END - CAL_START); h++) {
+      linesHtml += `<div class="cal-hour-line" style="top:${h*HOUR_PX}px"></div>`;
+    }
+
+    // Events for this day
+    const dayStart = new Date(day);
+    const dayEnd   = new Date(day); dayEnd.setDate(dayEnd.getDate()+1);
+    const dayEvts  = weekEvents.filter(e => {
+      const d = new Date(e.start);
+      return d >= dayStart && d < dayEnd;
+    });
+
+    let evtsHtml = dayEvts.map(e => {
+      const start = new Date(e.start);
+      const end   = new Date(e.end);
+      const startH = start.getHours() + start.getMinutes()/60;
+      const endH   = end.getHours()   + end.getMinutes()/60;
+      const top    = Math.max(0, (startH - CAL_START) * HOUR_PX);
+      const height = Math.max(22, (endH - startH) * HOUR_PX);
+      const urgCls = (e.urgency||'medium').toLowerCase();
+      const evtIdx = _calEvents.indexOf(e);
+      return `<div class="cal-event urgency-${urgCls}"
+                   style="top:${top}px;height:${height}px"
+                   onclick="openCalPopup(${evtIdx})">
+        <div class="cal-event-title">${esc(e.title)}</div>
+        <div class="cal-event-time">${esc(_fmtTime(start))}–${esc(_fmtTime(end))}</div>
+      </div>`;
+    }).join('');
+
+    daysHtml += `<div class="cal-day-col">${linesHtml}${evtsHtml}</div>`;
+  }
+
+  el('cal-day-headers').innerHTML = headersHtml;
+  el('cal-times').innerHTML       = timesHtml;
+  el('cal-days').innerHTML        = daysHtml;
+
+  // Empty state
+  const hasEvts = weekEvents.length > 0;
+  el('cal-empty-week').style.display       = hasEvts ? 'none' : '';
+  el('cal-grid-container').style.display   = hasEvts ? '' : 'none';
+}
+
+/* ── Event popup ─────────────────────────────────────────────────────────── */
+function openCalPopup(idx) {
+  const e = _calEvents[idx];
+  if (!e) return;
+  const start = new Date(e.start);
+  const end   = new Date(e.end);
+  const dateStr = start.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  const timeStr = `${_fmtTime(start)} – ${_fmtTime(end)}`;
+  const fields  = _parseDesc(e.description);
+
+  const row = (label, val) =>
+    val ? `<div class="cal-popup-row"><span class="cal-popup-label">${label}</span><span class="cal-popup-value">${esc(val)}</span></div>` : '';
+
+  el('cal-popup-content').innerHTML = `
+    <div class="cal-popup-title">${esc(e.title)}</div>
+    <div class="cal-popup-row">
+      <span class="cal-popup-label">When</span>
+      <span class="cal-popup-value">${esc(dateStr)} · ${esc(timeStr)}</span>
+    </div>
+    ${row('Tenant',  fields['Tenant'])}
+    ${row('Unit',    fields['Unit'])}
+    ${row('Issue',   fields['Issue'])}
+    ${row('Vendor',  fields['Vendor'])}
+    <div class="cal-popup-row">
+      <span class="cal-popup-label">Urgency</span>
+      <span class="cal-popup-value">${urgencyBadge(e.urgency)}</span>
+    </div>
+    ${row('Status',  fields['Status'])}
+  `;
+  el('cal-popup').style.display = 'flex';
+}
+
+function closeCalPopup() {
+  el('cal-popup').style.display = 'none';
+}
+
+// Close popup on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && el('cal-popup').style.display !== 'none') {
+    closeCalPopup();
+  }
+});
 </script>
 </body>
 </html>

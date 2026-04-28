@@ -49,7 +49,7 @@ from fastapi.responses import FileResponse
 from sheets_client import get_sheets_service
 from config import (
     GOOGLE_SPREADSHEET_ID, GOOGLE_SHEET_NAME, GOOGLE_PENDING_SHEET,
-    GOOGLE_SHEETS_CREDENTIALS_FILE, GMAIL_USER_EMAIL,
+    GOOGLE_SHEETS_CREDENTIALS_FILE, GMAIL_USER_EMAIL, PROPFLOW_CALENDAR_ID,
 )
 
 app = FastAPI(title="PropFlow Mission Control", version="1.0.0")
@@ -410,6 +410,32 @@ def pending_endpoint():
         x["escalates_in_minutes"] if x["escalates_in_minutes"] is not None else 9999,
     ))
 
+    return result
+
+
+# ── Calendar endpoint ─────────────────────────────────────────────────────────
+
+_calendar_cache: tuple[float, dict] | None = None
+_CALENDAR_CACHE_TTL = 60  # seconds
+
+
+@app.get("/api/calendar")
+def calendar_endpoint():
+    """Returns upcoming calendar events for the next 7 days (60s cache)."""
+    global _calendar_cache
+    now = time.monotonic()
+    if _calendar_cache is not None:
+        ts, data = _calendar_cache
+        if now - ts < _CALENDAR_CACHE_TTL:
+            return data
+    try:
+        from calendar_client import get_upcoming_events
+        events = get_upcoming_events(days=7)
+    except Exception as e:
+        logger.error("Failed to fetch calendar events: %s", e)
+        events = []
+    result = {"events": events, "calendar_id": PROPFLOW_CALENDAR_ID or ""}
+    _calendar_cache = (now, result)
     return result
 
 

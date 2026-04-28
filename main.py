@@ -40,6 +40,7 @@ from sheets_client import (
     get_awaiting_super_rows,
     update_pending_status,
     set_review_flag,
+    set_calendar_event_id,
 )
 from agents.email_parser import parse_email, build_acknowledgment
 from agents.router import (
@@ -414,6 +415,27 @@ def process_super_reply(email: dict, pending: dict, pending_row: int) -> None:
             vendor_body = build_vendor_outreach(parsed_for_body, building)
             notify_vendor(vendor, request_subject, vendor_body)
             logger.info("Cycle 2 vendor outreach sent to %s.", vendor.get("vendor_name"))
+
+            # ── Create placeholder Calendar event ─────────────────────────
+            try:
+                from calendar_client import create_placeholder_event
+                # Enrich parsed_for_body with tenant_name from the pending row
+                parsed_for_body["tenant_name"] = pending.get("tenant_name") or ""
+                event_id = create_placeholder_event(parsed_for_body, building, vendor)
+                if event_id:
+                    logger.info("Calendar event created: %s", event_id)
+                    if tenant_row_int:
+                        try:
+                            set_calendar_event_id(tenant_row_int, event_id)
+                        except Exception as cal_sheet_err:
+                            logger.error(
+                                "Failed to store calendar_event_id for row %d: %s",
+                                tenant_row_int, cal_sheet_err,
+                            )
+            except Exception as cal_err:
+                logger.error(
+                    "Calendar event creation failed (non-fatal): %s", cal_err, exc_info=True
+                )
 
         # Notify tenant a vendor has been assigned
         if tenant_email:

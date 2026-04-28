@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# ── Tenant Requests tab columns (A–P) ────────────────────────────────────────
-# Phase 1: A–I  |  Phase 2: J–N  |  Threading: O  |  Review: P
+# ── Tenant Requests tab columns (A–R) ────────────────────────────────────────
+# Phase 1: A–I  |  Phase 2: J–N  |  Threading: O  |  Review: P  |  (Q reserved)  |  Calendar: R
 COLUMNS = [
     "Timestamp",            # A  [0]
     "Tenant Name",          # B  [1]
@@ -51,6 +51,8 @@ COLUMNS = [
     "Approval Required",    # N  [13]
     "thread_id",            # O  [14] — Gmail thread ID for dashboard email viewer
     "review_flag",          # P  [15] — NEEDS_REVIEW if sender classification is fuzzy
+    "",                     # Q  [16] — reserved (blank column in sheet)
+    "calendar_event_id",    # R  [17] — Google Calendar event ID created at vendor dispatch
 ]
 
 # ── Buildings tab expected headers (row 1) ────────────────────────────────────
@@ -133,17 +135,18 @@ def append_row(parsed: dict) -> int | None:
         "",  # N Approval Required
         parsed.get("thread_id") or "",     # O [14] thread_id
         parsed.get("review_flag") or "",   # P [15] review_flag
+        "",                                # Q [16] reserved
+        "",                                # R [17] calendar_event_id — written later by set_calendar_event_id()
     ]
 
     service = get_sheets_service()
     range_name = f"{GOOGLE_SHEET_NAME}!A1"
 
     logger.info(
-        "append_row: writing %d values — thread_id[14]=%r review_flag[15]=%r full_row=%r",
+        "append_row: writing %d values — thread_id[14]=%r review_flag[15]=%r",
         len(row),
         row[14] if len(row) > 14 else "MISSING",
         row[15] if len(row) > 15 else "MISSING",
-        row,
     )
 
     try:
@@ -570,6 +573,31 @@ def update_row(row_number: int, fields: dict) -> None:
         logger.info("Updated Phase 2 fields for row %d: %s", row_number, list(fields.keys()))
     except HttpError as e:
         logger.error("Failed to update row %d: %s", row_number, e)
+        raise
+
+
+def set_calendar_event_id(row_number: int, event_id: str) -> None:
+    """
+    Writes a Google Calendar event ID to column R of a Tenant Requests row.
+
+    Called after create_placeholder_event() succeeds in Cycle 2 (vendor dispatch).
+
+    Args:
+        row_number: 1-based row number in the Tenant Requests tab.
+        event_id:   Google Calendar event ID string. Pass "" to clear.
+    """
+    service = get_sheets_service()
+    range_ = f"{GOOGLE_SHEET_NAME}!R{row_number}"
+    try:
+        service.spreadsheets().values().update(
+            spreadsheetId=GOOGLE_SPREADSHEET_ID,
+            range=range_,
+            valueInputOption="USER_ENTERED",
+            body={"values": [[event_id]]},
+        ).execute()
+        logger.info("set_calendar_event_id: row %d → %r (column R)", row_number, event_id)
+    except HttpError as e:
+        logger.error("Failed to set calendar_event_id on row %d: %s", row_number, e)
         raise
 
 
