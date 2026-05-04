@@ -22,7 +22,7 @@ GOOGLE_SPREADSHEET_ID = os.getenv("GOOGLE_SPREADSHEET_ID")
 GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "Tenant Requests")
 GOOGLE_BUILDINGS_SHEET = os.getenv("GOOGLE_BUILDINGS_SHEET", "Buildings")
 GOOGLE_VENDORS_SHEET = os.getenv("GOOGLE_VENDORS_SHEET", "Vendors")
-GOOGLE_PENDING_SHEET = os.getenv("GOOGLE_PENDING_SHEET", "Pending")
+GOOGLE_PENDING_SHEET = os.getenv("GOOGLE_PENDING_SHEET", "Pending Requests")
 
 # Google Drive folder path containing management agreement PDFs
 PROPFLOW_DRIVE_FOLDER = os.getenv("PROPFLOW_DRIVE_FOLDER", "PropFlow/Management Agreements")
