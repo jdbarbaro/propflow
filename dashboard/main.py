@@ -73,7 +73,7 @@ def index():
 
 # ── Sheet cache (30s TTL) ─────────────────────────────────────────────────────
 _cache: dict[str, tuple[float, Any]] = {}
-_CACHE_TTL = 30  # seconds
+_CACHE_TTL = 3600  # seconds
 
 
 def _cached_read(tab_name: str) -> list[dict]:

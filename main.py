@@ -61,7 +61,7 @@ from agents.super_gate import (
     parse_super_reply,
 )
 
-POLL_INTERVAL_SECONDS = 60
+POLL_INTERVAL_SECONDS = 3600
 
 logging.basicConfig(
     level=logging.INFO,
